@@ -1,0 +1,56 @@
+services:
+  app:
+      command: go run cmd/main.go
+      build:
+        dockerfile: Dockerfile.local
+        context: .
+      depends_on:
+        app-db:
+          condition: service_healthy
+          restart: true
+      volumes:
+        - .:/app
+      environment:
+        - DB_USER=root
+        - DB_PASSWORD=root
+        - DB_NAME=app-db
+        - DB_HOST=app-db
+        - DB_PORT=5432
+        - HTTP_SERVER_PORT=3000
+        - SERVICE_NAME=tezos-delegation
+        - WORKER_COUNT=20
+        - POLLER_INTERVAL=10
+        - POLLER_URL=https://api.tzkt.io/v1/operations/delegations?select=id,timestamp,amount,sender,level
+      ports:
+        - "3000:3000"
+
+  app-migrations:
+    build:
+      dockerfile: Dockerfile.local
+      context: .
+    depends_on:
+      app-db:
+        condition: service_healthy
+        restart: true
+    command: /go/bin/goose -dir /go/src/app/internal/database/migrations postgres "host=app-db port=5432 user=root password=root dbname=app-db sslmode=disable" up
+    environment:
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=app-db
+      - DB_HOST=app-db
+      - DB_PORT=5432
+
+  app-db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: 'root'
+      POSTGRES_PASSWORD: 'root'
+      POSTGRES_DB: 'app-db'
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d app-db"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s

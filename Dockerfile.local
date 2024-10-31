@@ -1,0 +1,17 @@
+FROM golang:1-alpine
+
+WORKDIR /src/app
+
+COPY go.mod .
+COPY go.sum .
+
+RUN apk add --no-cache make && \
+    go get -u github.com/pressly/goose/v3/cmd/goose && \
+    go install github.com/pressly/goose/v3/cmd/goose && \
+    go mod download
+
+COPY internal/database/migrations /go/src/app/internal/database/migrations
+
+COPY . .
+
+EXPOSE 3000
